@@ -1,6 +1,6 @@
 // Guarda o app no aparelho para abrir rápido e funcionar offline.
 // Ao mudar qualquer arquivo do app, aumente a versão abaixo.
-const VERSAO = 'calc3d-v1';
+const VERSAO = 'calc3d-v2';
 const ARQUIVOS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

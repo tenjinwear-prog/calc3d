@@ -116,6 +116,19 @@ details summary{cursor:pointer;font-size:14px;color:var(--ink-2);padding:10px 0 
 .stat b{font-size:34px;letter-spacing:-.02em}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw}
 .toast.show{opacity:1}
+.mats{display:grid;gap:8px}
+.mat{display:grid;grid-template-columns:minmax(0,1fr) 104px auto;gap:8px;align-items:center}
+.mat select{min-width:0}
+.mat .x,.fitem .x{border:0;background:var(--surface-2);color:var(--ink-2);width:44px;height:44px;border-radius:10px;font-size:20px;cursor:pointer}
+.flist{display:grid;gap:10px}
+.fitem{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.fitem input,.fitem select{background:var(--surface)}
+.fitem .span2{grid-column:1/-1}
+.fmeta{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fmeta .btn{min-height:36px;padding:6px 12px}
+.seg{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px}
+.seg button{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:8px 16px;font:inherit;font-weight:600;cursor:pointer;min-height:40px}
+.seg button[aria-selected="true"]{background:var(--mkt-soft);border-color:var(--mkt);color:var(--mkt)}
 .chip-fis{color:var(--fis);font-weight:700} .chip-mkt{color:var(--mkt);font-weight:700}
 @media (max-width:380px){.prices{grid-template-columns:1fr}.price b{font-size:24px}}
 </style>
@@ -134,28 +147,41 @@ details summary{cursor:pointer;font-size:14px;color:var(--ink-2);padding:10px 0 
 /* ================= Dados ================= */
 const LS_KEY = 'calc3d:v1';
 const MIN_REGISTROS = 20; // registros necessários para usar a taxa de falha real
+const TIPOS = ['PLA', 'PETG', 'ABS', 'ASA', 'TPU', 'Nylon', 'PC', 'Outro'];
+const FILAMENTO_PADRAO = { id: 'pla', tipo: 'PLA', nome: '', precoKg: 100 };
+const PLATAFORMA_PADRAO = { id: 'shopee', nome: 'Shopee', taxaPct: 0, taxaFixa: 0 };
 const DEFAULTS = {
-  filamentoKg: 100, potenciaW: 200, tarifaKwh: 1, impressoraPreco: 3700, vidaUtilH: 5000,
+  potenciaW: 200, tarifaKwh: 1, impressoraPreco: 3700, vidaUtilH: 5000,
   manutencaoH: 0, maoObraH: 15, falhaPadrao: 5, usarFalhaReal: true,
   imposto: 0, embalagem: 0, margemSug: 40, margemMin: 15,
-  mktNome: 'Shopee', mktTaxaPct: 0, mktTaxaFixa: 0, updatedAt: 0
+  filamentos: [FILAMENTO_PADRAO], plataformas: [PLATAFORMA_PADRAO], updatedAt: 0
 };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.')); return isFinite(n) ? n : 0; };
 const bool = v => v === true || v === 'true' || v === 'TRUE';
+// Listas chegam da planilha como texto JSON; aqui viram listas de novo.
+function lista(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string' && v.trim().startsWith('[')) { try { const a = JSON.parse(v); if (Array.isArray(a)) return a; } catch (e) {} }
+  return null;
+}
 
 function normalize(s) {
   s = s || {};
   return {
-    settings: { ...DEFAULTS, ...(s.settings || {}) },
+    settings: normSettings(s.settings),
     produtos: (s.produtos || []).map(normProduto),
     registros: (s.registros || []).map(normRegistro),
     sync: { url: '', token: '', ...(s.sync || {}) },
-    ui: { produtoId: null, ...(s.ui || {}) }
+    ui: { produtoId: null, plataformaId: null, ...(s.ui || {}) }
   };
 }
+function normMaterial(m) { return { fid: String(m.fid ?? ''), g: num(m.g) }; }
 function normProduto(p) {
-  return { id: String(p.id), nome: String(p.nome ?? ''), gramas: num(p.gramas), horas: num(p.horas),
+  let materiais = (lista(p.materiais) || []).map(normMaterial);
+  // Produtos da versão 1 só tinham o total de gramas: vira um material com o primeiro filamento.
+  if (!materiais.length) materiais = [{ fid: '', g: num(p.gramas) }];
+  return { id: String(p.id), nome: String(p.nome ?? ''), materiais, gramas: materiais.reduce((t, m) => t + m.g, 0), horas: num(p.horas),
     manualMin: num(p.manualMin), concorrentes: String(p.concorrentes ?? ''), updatedAt: num(p.updatedAt), deleted: bool(p.deleted) };
 }
 function normRegistro(r) {
@@ -164,9 +190,34 @@ function normRegistro(r) {
     updatedAt: num(r.updatedAt), deleted: bool(r.deleted) };
 }
 function normSettings(s) {
-  const o = { ...DEFAULTS };
-  for (const k in DEFAULTS) if (s && k in s) o[k] = typeof DEFAULTS[k] === 'number' ? num(s[k]) : typeof DEFAULTS[k] === 'boolean' ? bool(s[k]) : String(s[k]);
+  s = s || {};
+  const o = {};
+  for (const k in DEFAULTS) {
+    const d = DEFAULTS[k];
+    if (Array.isArray(d)) continue;
+    o[k] = !(k in s) ? d : typeof d === 'number' ? num(s[k]) : typeof d === 'boolean' ? bool(s[k]) : String(s[k]);
+  }
+  // Versão 1 tinha um único filamento (filamentoKg) e uma única plataforma (mkt*).
+  const fil = lista(s.filamentos) || [{ ...FILAMENTO_PADRAO, precoKg: 'filamentoKg' in s ? num(s.filamentoKg) : FILAMENTO_PADRAO.precoKg }];
+  o.filamentos = fil.map(f => ({ id: String(f.id || uid()), tipo: String(f.tipo || 'PLA'), nome: String(f.nome ?? ''), precoKg: num(f.precoKg) }));
+  if (!o.filamentos.length) o.filamentos = [{ ...FILAMENTO_PADRAO }];
+  const pl = lista(s.plataformas) || [{ id: 'shopee', nome: s.mktNome ? String(s.mktNome) : 'Shopee', taxaPct: num(s.mktTaxaPct), taxaFixa: num(s.mktTaxaFixa) }];
+  o.plataformas = pl.map(p => ({ id: String(p.id || uid()), nome: String(p.nome ?? ''), taxaPct: num(p.taxaPct), taxaFixa: num(p.taxaFixa) }));
+  if (!o.plataformas.length) o.plataformas = [{ ...PLATAFORMA_PADRAO }];
   return o;
+}
+const filamento = fid => state.settings.filamentos.find(f => f.id === fid) || state.settings.filamentos[0];
+const nomeFilamento = f => f.tipo + (f.nome ? ' ' + f.nome : '');
+const plataforma = () => state.settings.plataformas.find(p => p.id === state.ui.plataformaId) || state.settings.plataformas[0];
+const nomePlataforma = () => plataforma().nome || 'Marketplace';
+// Para a planilha, as listas vão como texto JSON (uma célula cada).
+function paraPlanilha() {
+  const s = state.settings;
+  return {
+    settings: { ...s, filamentos: JSON.stringify(s.filamentos), plataformas: JSON.stringify(s.plataformas) },
+    produtos: state.produtos.map(p => ({ ...p, materiais: JSON.stringify(p.materiais) })),
+    registros: state.registros
+  };
 }
 let state = (() => { try { return normalize(JSON.parse(localStorage.getItem(LS_KEY))); } catch (e) { return normalize(); } })();
 function save(changed) {
@@ -186,20 +237,21 @@ function taxaFalha() {
 }
 function custo(p) {
   const s = state.settings, h = p.horas;
-  const filamento = p.gramas * s.filamentoKg / 1000;
+  const porMaterial = p.materiais.map(m => { const f = filamento(m.fid); return { f, g: m.g, valor: m.g * f.precoKg / 1000 }; });
+  const filamento_ = porMaterial.reduce((t, m) => t + m.valor, 0);
   const energia = s.potenciaW / 1000 * h * s.tarifaKwh;
   const desgaste = s.vidaUtilH > 0 ? s.impressoraPreco / s.vidaUtilH * h : 0;
   const manutencao = s.manutencaoH * h;
   const maoObra = p.manualMin / 60 * s.maoObraH;
-  const producao = filamento + energia + desgaste + manutencao + maoObra;
+  const producao = filamento_ + energia + desgaste + manutencao + maoObra;
   const tf = taxaFalha();
   const ajustado = producao / (1 - tf.taxa);
-  return { filamento, energia, desgaste, manutencao, maoObra, producao, falha: ajustado - producao, ajustado, tf };
+  return { filamento: filamento_, porMaterial, energia, desgaste, manutencao, maoObra, producao, falha: ajustado - producao, ajustado, tf };
 }
 function precos(p, canal) {
-  const s = state.settings, c = custo(p);
-  const fixa = canal === 'mkt' ? s.mktTaxaFixa : 0;
-  const desc = s.imposto / 100 + (canal === 'mkt' ? s.mktTaxaPct / 100 : 0);
+  const s = state.settings, c = custo(p), pl = plataforma();
+  const fixa = canal === 'mkt' ? pl.taxaFixa : 0;
+  const desc = s.imposto / 100 + (canal === 'mkt' ? pl.taxaPct / 100 : 0);
   const base = c.ajustado + s.embalagem + fixa;
   const preco = m => { const d = 1 - desc - m; return d > 0 ? base / d : NaN; };
   const lucro = P => P * (1 - desc) - base; // lucro por unidade a um preço P
@@ -227,7 +279,7 @@ const TITULOS = { home: 'Calculadora 3D', fisico: 'Venda física', mkt: 'Marketp
 function rota() { const r = location.hash.slice(1); return TITULOS[r] ? r : 'home'; }
 function render() {
   const r = rota();
-  $('title').textContent = r === 'mkt' ? state.settings.mktNome || 'Marketplace' : TITULOS[r];
+  $('title').textContent = r === 'mkt' ? nomePlataforma() : TITULOS[r];
   $('back').hidden = r === 'home';
   const app = $('app');
   app.innerHTML = r === 'home' ? telaHome() : r === 'fisico' || r === 'mkt' ? telaCanal(r) : r === 'producao' ? telaProducao() : telaConfig();
@@ -240,32 +292,52 @@ function telaHome() {
   <div class="home-hero"><p>Escolha o canal de venda.</p></div>
   <div class="channels">
     <button class="channel fis" data-go="fisico"><span class="ico">⇄</span><div><b>Físico</b><br><span>Venda direta, sem taxas</span></div></button>
-    <button class="channel mkt" data-go="mkt"><span class="ico">◫</span><div><b>${esc(state.settings.mktNome || 'Marketplace')}</b><br><span>Com taxas e concorrência</span></div></button>
+    <button class="channel mkt" data-go="mkt"><span class="ico">◫</span><div><b>${esc(nomePlataforma())}</b><br><span>${state.settings.plataformas.length > 1 ? `Marketplace · ${state.settings.plataformas.length} plataformas` : 'Com taxas e concorrência'}</span></div></button>
   </div>
   <div class="links">
     <button class="link" data-go="producao"><div>Impressões e falhas<small>Taxa de falha em uso: ${pct(tf.taxa)} ${tf.real ? '(real)' : '(padrão)'}</small></div><span>›</span></button>
-    <button class="link" data-go="config"><div>Configurações<small>Filamento, energia, margens, taxas e sincronização</small></div><span>›</span></button>
+    <button class="link" data-go="config"><div>Configurações<small>Filamentos, plataformas, margens e sincronização</small></div><span>›</span></button>
   </div>`;
 }
 function campoNum(id, lab, val, unidade, extra = '') {
   return `<div ${extra}><label for="${id}">${lab}</label><div class="unit"><input id="${id}" type="number" inputmode="decimal" step="any" min="0" value="${val}"><em>${unidade}</em></div></div>`;
 }
+function opcoesFilamento(fidAtual) {
+  const fs = state.settings.filamentos, atual = filamento(fidAtual);
+  return fs.map(f => `<option value="${f.id}" ${f.id === atual.id ? 'selected' : ''}>${esc(nomeFilamento(f))}</option>`).join('');
+}
+function totalGramasTxt(p) { return `Total: ${p.gramas.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} g`; }
 function blocoProduto() {
-  const lista = produtosAtivos(), p = produtoAtual();
+  const prods = produtosAtivos(), p = produtoAtual();
   if (!p) return `<div class="card"><div class="empty"><p>Nenhum produto cadastrado ainda.</p><button class="btn primary" data-act="novo">+ Novo produto</button></div></div>`;
   const h = Math.floor(p.horas + 1e-9), m = Math.round((p.horas - h) * 60);
+  const varios = p.materiais.length > 1;
   return `<div class="card">
     <h2>Produto</h2>
     <div class="row" style="margin-bottom:12px">
-      <select id="selProduto" aria-label="Produto">${lista.map(x => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.nome || 'Sem nome')}</option>`).join('')}</select>
+      <select id="selProduto" aria-label="Produto">${prods.map(x => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.nome || 'Sem nome')}</option>`).join('')}</select>
       <button class="btn" data-act="novo" aria-label="Novo produto">+ Novo</button>
     </div>
     <div class="grid">
       <div class="full"><label for="pNome">Nome</label><input id="pNome" data-pf="nome" value="${esc(p.nome)}" placeholder="Ex.: Chaveiro flor-de-lis"></div>
-      ${campoNum('pGramas', 'Filamento', p.gramas || '', 'g').replace('<input', '<input data-pf="gramas"')}
-      ${campoNum('pManual', 'Trabalho manual', p.manualMin || '', 'min').replace('<input', '<input data-pf="manualMin"')}
+      <div class="full">
+        <label>Filamento</label>
+        <div class="mats">
+          ${p.materiais.map((mt, i) => `<div class="mat">
+            <select id="mf${i}" data-mf="${i}" aria-label="Filamento ${i + 1}">${opcoesFilamento(mt.fid)}</select>
+            <div class="unit"><input id="mg${i}" data-mg="${i}" type="number" inputmode="decimal" step="any" min="0" value="${mt.g || ''}" aria-label="Gramas do filamento ${i + 1}"><em>g</em></div>
+            ${varios ? `<button class="x" data-act="rmmat" data-i="${i}" aria-label="Remover filamento ${i + 1}">×</button>` : ''}
+          </div>`).join('')}
+        </div>
+        <div class="row" style="justify-content:space-between;margin-top:8px;flex-wrap:wrap">
+          <button class="btn" data-act="addmat">+ Outro material</button>
+          ${varios ? `<span class="muted num" id="pTotalG">${totalGramasTxt(p)}</span>` : ''}
+        </div>
+        <p class="hint">Use as gramas do fatiador, já com a purga das trocas de cor.</p>
+      </div>
       ${campoNum('pH', 'Tempo de impressão', h || '', 'h').replace('<input', '<input data-pf="h"')}
       ${campoNum('pM', '&nbsp;', m || '', 'min').replace('<input', '<input data-pf="m"')}
+      ${campoNum('pManual', 'Trabalho manual', p.manualMin || '', 'min').replace('<input', '<input data-pf="manualMin"')}
     </div>
     <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn danger" data-act="excluir">Excluir produto</button></div>
   </div>`;
@@ -276,23 +348,29 @@ function telaCanal(canal) {
   if (p && canal === 'fisico') extra = `<div class="card"><h2>Negociação</h2>
       <div class="grid">${campoNum('nQtd', 'Quantidade', '', 'un')}${campoNum('nTotal', 'Valor combinado (total)', '', 'R$')}</div>
       <div id="negRes"><p class="hint">Digite a quantidade e o valor total para ver se o acordo vale a pena.</p></div></div>`;
+  const pls = state.settings.plataformas;
+  const seletor = canal === 'mkt' && pls.length > 1
+    ? `<div class="seg" role="tablist" aria-label="Plataforma">${pls.map(x => `<button role="tab" aria-selected="${x.id === plataforma().id}" data-plat="${x.id}">${esc(x.nome || 'Sem nome')}</button>`).join('')}</div>` : '';
   if (p && canal === 'mkt') extra = `<div class="card"><h2>Concorrentes</h2>
       <label for="conc">Cole os preços de outros vendedores</label>
       <textarea id="conc" placeholder="Ex.: 12,90  15,00  R$ 18,50">${esc(p.concorrentes)}</textarea>
       <div id="concRes"></div></div>`;
-  return blocoProduto() + (p ? `<div class="card"><h2>Preço <span class="chip-${cls}">${canal === 'fisico' ? 'físico' : esc(state.settings.mktNome || 'marketplace')}</span></h2><div id="res"></div></div>` : '') + extra;
+  return seletor + blocoProduto() + (p ? `<div class="card"><h2>Preço <span class="chip-${cls}">${canal === 'fisico' ? 'físico' : esc(nomePlataforma())}</span></h2><div id="res"></div></div>` : '') + extra;
 }
 function atualizarCanal(canal) {
   const p = produtoAtual(); if (!p) return;
-  const r = precos(p, canal), c = r.c, s = state.settings, cls = canal === 'fisico' ? 'fis' : 'mkt';
+  const r = precos(p, canal), c = r.c, s = state.settings, cls = canal === 'fisico' ? 'fis' : 'mkt', pl = plataforma(), plNome = esc(nomePlataforma());
   const semDados = !p.gramas && !p.horas && !p.manualMin;
-  const linhas = [['Filamento', c.filamento], ['Energia', c.energia], ['Desgaste da impressora', c.desgaste]];
+  const linhas = c.porMaterial.length > 1
+    ? c.porMaterial.map(m => [`${esc(nomeFilamento(m.f))} (${m.g.toLocaleString('pt-BR')} g)`, m.valor])
+    : [[`Filamento ${esc(nomeFilamento(c.porMaterial[0].f))}`, c.filamento]];
+  linhas.push(['Energia', c.energia], ['Desgaste da impressora', c.desgaste]);
   if (s.manutencaoH) linhas.push(['Manutenção', c.manutencao]);
   linhas.push(['Mão de obra', c.maoObra], [`Falhas (${pct(c.tf.taxa)})`, c.falha]);
   if (s.embalagem) linhas.push(['Embalagem', s.embalagem]);
-  if (r.fixa) linhas.push([`Taxa fixa ${esc(s.mktNome)}`, r.fixa]);
+  if (r.fixa) linhas.push([`Taxa fixa ${plNome}`, r.fixa]);
   const descTxt = canal === 'mkt'
-    ? `${s.mktTaxaPct ? `Taxa ${esc(s.mktNome)} ${s.mktTaxaPct}%` : `<b>Taxa do ${esc(s.mktNome)} não configurada</b>`}${s.imposto ? ` · imposto ${s.imposto}%` : ''}`
+    ? `${pl.taxaPct ? `Comissão ${plNome} ${pl.taxaPct}%` : `<b>Comissão do ${plNome} não configurada</b>`}${s.imposto ? ` · imposto ${s.imposto}%` : ''}`
     : (s.imposto ? `Imposto ${s.imposto}%` : 'Sem taxas');
   $('res').innerHTML = `
     ${semDados ? '<p class="hint" style="margin-top:0">Preencha o filamento e o tempo de impressão.</p>' : ''}
@@ -367,8 +445,19 @@ function telaProducao() {
 }
 function telaConfig() {
   const s = state.settings, sy = state.sync, f = (k, lab, u, hint) => `<div>${campoNum('c_' + k, lab, s[k], u).replace('<input', `<input data-cf="${k}"`)}${hint ? `<p class="hint">${hint}</p>` : ''}</div>`;
-  return `<div class="card"><h2>Material e máquina</h2><div class="grid">
-      ${f('filamentoKg', 'Filamento (PLA)', 'R$/kg')}${f('potenciaW', 'Potência média', 'W', 'Média ao imprimir, não o pico')}
+  const usos = fid => produtosAtivos().filter(p => p.materiais.some(m => filamento(m.fid).id === fid)).length;
+  const umFil = s.filamentos.length === 1, umaPl = s.plataformas.length === 1;
+  return `<div class="card"><h2>Filamentos</h2>
+      <div class="flist">${s.filamentos.map((x, i) => `<div class="fitem">
+        <div><label for="ft${i}">Tipo</label><select id="ft${i}" data-ff="tipo" data-i="${i}">${[...new Set([...TIPOS, x.tipo])].map(t => `<option ${t === x.tipo ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+        <div><label for="fp${i}">Preço</label><div class="unit"><input id="fp${i}" data-ff="precoKg" data-i="${i}" type="number" inputmode="decimal" step="any" min="0" value="${x.precoKg}"><em>R$/kg</em></div></div>
+        <div class="span2"><label for="fn${i}">Marca, cor ou acabamento (opcional)</label><input id="fn${i}" data-ff="nome" data-i="${i}" value="${esc(x.nome)}" placeholder="Ex.: Silk, Voolt3D, Preto fosco"></div>
+        <div class="fmeta"><span class="hint">${usos(x.id) ? `Usado em ${usos(x.id)} produto${usos(x.id) > 1 ? 's' : ''}` : 'Sem produtos'}</span>${umFil ? '' : `<button class="btn danger" data-act="rmfil" data-i="${i}">Remover</button>`}</div>
+      </div>`).join('')}</div>
+      <button class="btn" data-act="addfil" style="margin-top:12px">+ Adicionar filamento</button>
+    </div>
+    <div class="card"><h2>Máquina e energia</h2><div class="grid">
+      ${f('potenciaW', 'Potência média', 'W', 'Média ao imprimir, não o pico')}
       ${f('tarifaKwh', 'Tarifa de energia', 'R$/kWh', 'Confira na conta de luz')}${f('impressoraPreco', 'Preço da impressora', 'R$')}
       ${f('vidaUtilH', 'Vida útil', 'h')}${f('manutencaoH', 'Manutenção', 'R$/h', 'Bico, mesa, peças (opcional)')}
     </div></div>
@@ -380,10 +469,16 @@ function telaConfig() {
       ${f('margemSug', 'Margem sugerida', '%')}${f('margemMin', 'Margem mínima', '%')}
       ${f('imposto', 'Imposto', '%', 'Zero enquanto não houver MEI')}${f('embalagem', 'Embalagem', 'R$/un')}
     </div></div>
-    <div class="card"><h2>Marketplace</h2><div class="grid">
-      <div class="full"><label for="c_mktNome">Nome</label><input id="c_mktNome" data-cf="mktNome" value="${esc(s.mktNome)}"></div>
-      ${f('mktTaxaPct', 'Comissão', '%', 'Confira a taxa atual no painel do vendedor')}${f('mktTaxaFixa', 'Taxa fixa por item', 'R$')}
-    </div></div>
+    <div class="card"><h2>Plataformas de marketplace</h2>
+      <div class="flist">${s.plataformas.map((x, i) => `<div class="fitem">
+        <div class="span2"><label for="pln${i}">Nome</label><input id="pln${i}" data-pl="nome" data-i="${i}" value="${esc(x.nome)}" placeholder="Ex.: Mercado Livre"></div>
+        <div><label for="plp${i}">Comissão</label><div class="unit"><input id="plp${i}" data-pl="taxaPct" data-i="${i}" type="number" inputmode="decimal" step="any" min="0" value="${x.taxaPct}"><em>%</em></div></div>
+        <div><label for="plf${i}">Taxa fixa por item</label><div class="unit"><input id="plf${i}" data-pl="taxaFixa" data-i="${i}" type="number" inputmode="decimal" step="any" min="0" value="${x.taxaFixa}"><em>R$</em></div></div>
+        ${umaPl ? '' : `<div class="fmeta"><span></span><button class="btn danger" data-act="rmplat" data-i="${i}">Remover</button></div>`}
+      </div>`).join('')}</div>
+      <p class="hint">Confira a comissão e a taxa fixa atuais no painel de vendedor de cada plataforma.</p>
+      <button class="btn" data-act="addplat" style="margin-top:4px">+ Adicionar plataforma</button>
+    </div>
     <div class="card"><h2>Sincronização (Google Sheets)</h2>
       <div class="grid">
         <div class="full"><label for="sUrl">Endereço do Apps Script</label><input id="sUrl" value="${esc(sy.url)}" placeholder="https://script.google.com/macros/s/.../exec"></div>
@@ -398,9 +493,34 @@ function telaConfig() {
 /* ================= Eventos ================= */
 document.addEventListener('click', e => {
   const go = e.target.closest('[data-go]'); if (go) { location.hash = go.dataset.go; return; }
+  const plat = e.target.closest('[data-plat]');
+  if (plat) { state.ui.plataformaId = plat.dataset.plat; save(false); render(); return; }
   const del = e.target.closest('[data-del]');
   if (del) { const r = state.registros.find(x => x.id === del.dataset.del); if (r && confirm('Apagar este registro?')) { r.deleted = true; r.updatedAt = Date.now(); save(true); render(); } return; }
-  const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
+  const btn = e.target.closest('[data-act]'), act = btn?.dataset.act; if (!act) return;
+  const idx = num(btn.dataset.i), s = state.settings;
+  const mudouConfig = () => { s.updatedAt = Date.now(); save(true); render(); };
+  if (act === 'addmat' || act === 'rmmat') {
+    const p = produtoAtual(); if (!p) return;
+    if (act === 'addmat') p.materiais.push({ fid: s.filamentos[0].id, g: 0 });
+    else p.materiais.splice(idx, 1);
+    p.gramas = p.materiais.reduce((t, m) => t + m.g, 0); p.updatedAt = Date.now(); save(true); render();
+    if (act === 'addmat') $('mg' + (p.materiais.length - 1))?.focus();
+  }
+  if (act === 'addfil') { s.filamentos.push({ id: uid(), tipo: 'PLA', nome: '', precoKg: 100 }); mudouConfig(); $('fn' + (s.filamentos.length - 1))?.focus(); }
+  if (act === 'rmfil' && s.filamentos.length > 1) {
+    const f = s.filamentos[idx], resto = s.filamentos.filter((_, i) => i !== idx);
+    const afetados = produtosAtivos().filter(p => p.materiais.some(m => filamento(m.fid).id === f.id));
+    const msg = afetados.length
+      ? `Remover ${nomeFilamento(f)}? ${afetados.length} produto${afetados.length > 1 ? 's passam' : ' passa'} a usar ${nomeFilamento(resto[0])} no lugar.`
+      : `Remover ${nomeFilamento(f)}?`;
+    if (confirm(msg)) {
+      afetados.forEach(p => { p.materiais.forEach(m => { if (filamento(m.fid).id === f.id) m.fid = resto[0].id; }); p.updatedAt = Date.now(); });
+      s.filamentos = resto; mudouConfig();
+    }
+  }
+  if (act === 'addplat') { s.plataformas.push({ id: uid(), nome: '', taxaPct: 0, taxaFixa: 0 }); mudouConfig(); $('pln' + (s.plataformas.length - 1))?.focus(); }
+  if (act === 'rmplat' && s.plataformas.length > 1 && confirm(`Remover ${s.plataformas[idx].nome || 'esta plataforma'}?`)) { s.plataformas.splice(idx, 1); mudouConfig(); }
   if (act === 'novo') { const p = normProduto({ id: uid(), nome: '', updatedAt: Date.now() }); state.produtos.push(p); state.ui.produtoId = p.id; save(true); render(); $('pNome')?.focus(); }
   if (act === 'excluir') { const p = produtoAtual(); if (p && confirm(`Excluir "${p.nome || 'Sem nome'}"? Ele some dos dois canais.`)) { p.deleted = true; p.updatedAt = Date.now(); state.ui.produtoId = null; save(true); render(); } }
   if (act === 'regok' || act === 'regfalha') {
@@ -418,7 +538,19 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   const t = e.target, r = rota();
-  if (t.dataset.pf) {
+  if (t.dataset.mf !== undefined || t.dataset.mg !== undefined) {
+    const p = produtoAtual(); if (!p) return;
+    const i = num(t.dataset.mf ?? t.dataset.mg);
+    if (t.dataset.mf !== undefined) p.materiais[i].fid = t.value; else p.materiais[i].g = num(t.value);
+    p.gramas = p.materiais.reduce((x, m) => x + m.g, 0); p.updatedAt = Date.now(); save(true);
+    const tot = $('pTotalG'); if (tot) tot.textContent = totalGramasTxt(p);
+    atualizarCanal(r);
+  } else if (t.dataset.ff || t.dataset.pl) {
+    const s = state.settings, i = num(t.dataset.i);
+    if (t.dataset.ff) { const k = t.dataset.ff; s.filamentos[i][k] = k === 'precoKg' ? num(t.value) : t.value; }
+    else { const k = t.dataset.pl; s.plataformas[i][k] = k === 'nome' ? t.value : num(t.value); }
+    s.updatedAt = Date.now(); save(true);
+  } else if (t.dataset.pf) {
     const p = produtoAtual(); if (!p) return;
     const k = t.dataset.pf;
     if (k === 'nome') p.nome = t.value;
@@ -479,7 +611,7 @@ async function sync(manual) {
     state.registros = mergeLista(state.registros, remoto.registros, normRegistro);
     save(false);
     const post = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ token, data: { settings: state.settings, produtos: state.produtos, registros: state.registros } }) });
+      body: JSON.stringify({ token, data: paraPlanilha() }) });
     const ok = await post.json();
     if (!ok.ok) throw new Error(ok.error || 'falha ao salvar');
     mostrarSync('ok');
