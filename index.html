@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculadora 3D</title>
+<meta name="description" content="Custo e preço de venda dos produtos 3D, para venda física e marketplace.">
+<meta name="theme-color" content="#1f2a24">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Calc 3D">
+<style>
+:root{
+  --bg:#edf1ee; --surface:#fbfcfa; --surface-2:#e2e8e4; --ink:#1f2a24; --ink-2:#56625b; --line:#d3dbd6;
+  --fis:#2f7d5b; --fis-soft:#dcefe4; --mkt:#d4622a; --mkt-soft:#f8e1d3;
+  --ok:#2f7d5b; --ok-soft:#dcefe4; --warn:#a86b00; --warn-soft:#fbecc8; --bad:#b83a2e; --bad-soft:#f8dcd8;
+  --radius:16px; --shadow:0 1px 2px rgba(31,42,36,.06),0 4px 14px rgba(31,42,36,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141a17; --surface:#1c2420; --surface-2:#26302b; --ink:#eef0ea; --ink-2:#a3aca5; --line:#33403a;
+    --fis:#5cc495; --fis-soft:#1f3a2e; --mkt:#f08a55; --mkt-soft:#3d2619;
+    --ok:#5cc495; --ok-soft:#1f3a2e; --warn:#e8b54a; --warn-soft:#3b3017; --bad:#f07a6e; --bad-soft:#3f1f1c;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141a17; --surface:#1c2420; --surface-2:#26302b; --ink:#eef0ea; --ink-2:#a3aca5; --line:#33403a;
+  --fis:#5cc495; --fis-soft:#1f3a2e; --mkt:#f08a55; --mkt-soft:#3d2619;
+  --ok:#5cc495; --ok-soft:#1f3a2e; --warn:#e8b54a; --warn-soft:#3b3017; --bad:#f07a6e; --bad-soft:#3f1f1c;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+.num{font-variant-numeric:tabular-nums}
+header{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0;flex:1;font-weight:650;letter-spacing:-.01em}
+.back{border:0;background:var(--surface-2);color:var(--ink);width:36px;height:36px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer}
+.sync{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ink-2)}
+.dot.ok{background:var(--ok)} .dot.sync{background:var(--warn);animation:pulse 1s infinite} .dot.erro{background:var(--bad)}
+@keyframes pulse{50%{opacity:.3}}
+main{max-width:720px;margin:0 auto;padding:16px 16px calc(40px + env(safe-area-inset-bottom))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);margin:0 0 12px;font-weight:650}
+.home-hero{padding:8px 0 18px}
+.home-hero p{margin:4px 0 0;color:var(--ink-2)}
+.channels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.channel{border:0;border-radius:20px;padding:22px 16px;text-align:left;cursor:pointer;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;color:var(--ink);font:inherit}
+.channel b{font-size:22px;letter-spacing:-.02em}
+.channel span{font-size:13px;color:var(--ink-2)}
+.channel.fis{background:var(--fis-soft);border:2px solid var(--fis)}
+.channel.mkt{background:var(--mkt-soft);border:2px solid var(--mkt)}
+.channel .ico{font-size:28px;line-height:1}
+.links{display:grid;gap:10px}
+.link{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;color:var(--ink);font:inherit;width:100%;text-align:left}
+.link small{color:var(--ink-2);display:block;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid .full{grid-column:1/-1}
+label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:4px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+textarea{min-height:84px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ink);outline-offset:1px}
+.unit{position:relative}
+.unit input{padding-right:46px}
+.unit em{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-style:normal;font-size:13px;color:var(--ink-2);pointer-events:none}
+.row{display:flex;gap:8px;align-items:center}
+.row select{flex:1}
+.btn{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:10px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer;min-height:44px;white-space:nowrap}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.danger{color:var(--bad)}
+.btn.big{flex:1;min-height:64px;font-size:17px;border-radius:14px}
+.btn.okb{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.btn.badb{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.prices{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.price{border-radius:14px;padding:14px;background:var(--surface-2)}
+.price small{display:block;font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;font-weight:650}
+.price b{display:block;font-size:28px;letter-spacing:-.02em;margin:4px 0 2px}
+.price span{font-size:12px;color:var(--ink-2)}
+.price.sug.fis{background:var(--fis-soft)} .price.sug.mkt{background:var(--mkt-soft)}
+.price.sug.fis b{color:var(--fis)} .price.sug.mkt b{color:var(--mkt)}
+.cost-line{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.cost-line:last-child{border-bottom:0}
+.cost-line.total{font-weight:700;border-top:1px solid var(--ink);border-bottom:0;margin-top:4px;padding-top:8px}
+details summary{cursor:pointer;font-size:14px;color:var(--ink-2);padding:10px 0 2px}
+.alert{border-radius:12px;padding:12px 14px;font-size:15px;margin-top:12px;border:1px solid}
+.alert b{display:block;margin-bottom:2px}
+.alert.ok{background:var(--ok-soft);border-color:var(--ok)} .alert.ok b{color:var(--ok)}
+.alert.warn{background:var(--warn-soft);border-color:var(--warn)} .alert.warn b{color:var(--warn)}
+.alert.bad{background:var(--bad-soft);border-color:var(--bad)} .alert.bad b{color:var(--bad)}
+.alert.info{background:var(--surface-2);border-color:var(--line)}
+.muted{color:var(--ink-2);font-size:14px}
+.hint{font-size:12px;color:var(--ink-2);margin-top:4px}
+.empty{text-align:center;padding:24px 8px;color:var(--ink-2)}
+.range{position:relative;height:54px;margin:18px 4px 6px}
+.range .track{position:absolute;left:0;right:0;top:22px;height:6px;border-radius:3px;background:var(--surface-2)}
+.range .span{position:absolute;top:22px;height:6px;border-radius:3px;background:var(--ink-2);opacity:.45}
+.range .mk{position:absolute;top:0;transform:translateX(-50%);text-align:center;font-size:11px;white-space:nowrap;color:var(--ink-2)}
+.range .mk i{display:block;width:2px;height:16px;margin:2px auto 0;background:currentColor}
+.range .mk.below{top:30px}
+.range .mk.below i{margin:0 auto 2px}
+.range .mk.min{color:var(--warn)} .range .mk.sug{color:var(--mkt)} .range .mk.eq{color:var(--bad)}
+.comp{position:absolute;top:19px;width:10px;height:10px;border-radius:50%;background:var(--ink);transform:translateX(-50%);opacity:.7}
+.log{list-style:none;margin:0;padding:0}
+.log li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.log li:last-child{border-bottom:0}
+.tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.04em}
+.tag.ok{background:var(--ok-soft);color:var(--ok)} .tag.falha{background:var(--bad-soft);color:var(--bad)}
+.log .grow{flex:1;min-width:0}
+.log .x{border:0;background:none;color:var(--ink-2);font-size:18px;cursor:pointer;padding:4px 8px}
+.stat{display:flex;align-items:baseline;gap:10px}
+.stat b{font-size:34px;letter-spacing:-.02em}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw}
+.toast.show{opacity:1}
+.chip-fis{color:var(--fis);font-weight:700} .chip-mkt{color:var(--mkt);font-weight:700}
+@media (max-width:380px){.prices{grid-template-columns:1fr}.price b{font-size:24px}}
+</style>
+</head>
+<body>
+<header>
+  <button class="back" id="back" aria-label="Voltar" hidden>‹</button>
+  <h1 id="title">Calculadora 3D</h1>
+  <div class="sync" id="sync" hidden><span class="dot" id="syncDot"></span><span id="syncTxt"></span></div>
+</header>
+<main id="app"></main>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ================= Dados ================= */
+const LS_KEY = 'calc3d:v1';
+const MIN_REGISTROS = 20; // registros necessários para usar a taxa de falha real
+const DEFAULTS = {
+  filamentoKg: 100, potenciaW: 200, tarifaKwh: 1, impressoraPreco: 3700, vidaUtilH: 5000,
+  manutencaoH: 0, maoObraH: 15, falhaPadrao: 5, usarFalhaReal: true,
+  imposto: 0, embalagem: 0, margemSug: 40, margemMin: 15,
+  mktNome: 'Shopee', mktTaxaPct: 0, mktTaxaFixa: 0, updatedAt: 0
+};
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.')); return isFinite(n) ? n : 0; };
+const bool = v => v === true || v === 'true' || v === 'TRUE';
+
+function normalize(s) {
+  s = s || {};
+  return {
+    settings: { ...DEFAULTS, ...(s.settings || {}) },
+    produtos: (s.produtos || []).map(normProduto),
+    registros: (s.registros || []).map(normRegistro),
+    sync: { url: '', token: '', ...(s.sync || {}) },
+    ui: { produtoId: null, ...(s.ui || {}) }
+  };
+}
+function normProduto(p) {
+  return { id: String(p.id), nome: String(p.nome ?? ''), gramas: num(p.gramas), horas: num(p.horas),
+    manualMin: num(p.manualMin), concorrentes: String(p.concorrentes ?? ''), updatedAt: num(p.updatedAt), deleted: bool(p.deleted) };
+}
+function normRegistro(r) {
+  return { id: String(r.id), data: String(r.data ?? ''), tipo: r.tipo === 'falha' ? 'falha' : 'ok',
+    produtoId: String(r.produtoId ?? ''), produto: String(r.produto ?? ''), motivo: String(r.motivo ?? ''),
+    updatedAt: num(r.updatedAt), deleted: bool(r.deleted) };
+}
+function normSettings(s) {
+  const o = { ...DEFAULTS };
+  for (const k in DEFAULTS) if (s && k in s) o[k] = typeof DEFAULTS[k] === 'number' ? num(s[k]) : typeof DEFAULTS[k] === 'boolean' ? bool(s[k]) : String(s[k]);
+  return o;
+}
+let state = (() => { try { return normalize(JSON.parse(localStorage.getItem(LS_KEY))); } catch (e) { return normalize(); } })();
+function save(changed) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+  if (changed) scheduleSync();
+}
+const produtosAtivos = () => state.produtos.filter(p => !p.deleted).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+const registrosAtivos = () => state.registros.filter(r => !r.deleted).sort((a, b) => b.updatedAt - a.updatedAt);
+const produtoAtual = () => produtosAtivos().find(p => p.id === state.ui.produtoId) || produtosAtivos()[0] || null;
+
+/* ================= Cálculo ================= */
+function taxaFalha() {
+  const regs = registrosAtivos(), n = regs.length, f = regs.filter(r => r.tipo === 'falha').length, s = state.settings;
+  const real = s.usarFalhaReal && n >= MIN_REGISTROS;
+  const taxa = real ? f / n : s.falhaPadrao / 100;
+  return { taxa: Math.min(Math.max(taxa, 0), 0.9), real, n, f };
+}
+function custo(p) {
+  const s = state.settings, h = p.horas;
+  const filamento = p.gramas * s.filamentoKg / 1000;
+  const energia = s.potenciaW / 1000 * h * s.tarifaKwh;
+  const desgaste = s.vidaUtilH > 0 ? s.impressoraPreco / s.vidaUtilH * h : 0;
+  const manutencao = s.manutencaoH * h;
+  const maoObra = p.manualMin / 60 * s.maoObraH;
+  const producao = filamento + energia + desgaste + manutencao + maoObra;
+  const tf = taxaFalha();
+  const ajustado = producao / (1 - tf.taxa);
+  return { filamento, energia, desgaste, manutencao, maoObra, producao, falha: ajustado - producao, ajustado, tf };
+}
+function precos(p, canal) {
+  const s = state.settings, c = custo(p);
+  const fixa = canal === 'mkt' ? s.mktTaxaFixa : 0;
+  const desc = s.imposto / 100 + (canal === 'mkt' ? s.mktTaxaPct / 100 : 0);
+  const base = c.ajustado + s.embalagem + fixa;
+  const preco = m => { const d = 1 - desc - m; return d > 0 ? base / d : NaN; };
+  const lucro = P => P * (1 - desc) - base; // lucro por unidade a um preço P
+  return { c, base, desc, fixa, equilibrio: preco(0), minimo: preco(s.margemMin / 100), sugerido: preco(s.margemSug / 100), lucro };
+}
+
+/* ================= Formatação ================= */
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const brl = v => isFinite(v) ? BRL.format(v) : '—';
+const pct = v => (v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200); }
+function parsePrecos(txt) {
+  return (txt.match(/\d[\d.]*(,\d+)?|\d+(\.\d+)?/g) || []).map(t => {
+    if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+    return parseFloat(t);
+  }).filter(v => isFinite(v) && v > 0);
+}
+const mediana = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+
+/* ================= Telas ================= */
+const TITULOS = { home: 'Calculadora 3D', fisico: 'Venda física', mkt: 'Marketplace', producao: 'Impressões e falhas', config: 'Configurações' };
+function rota() { const r = location.hash.slice(1); return TITULOS[r] ? r : 'home'; }
+function render() {
+  const r = rota();
+  $('title').textContent = r === 'mkt' ? state.settings.mktNome || 'Marketplace' : TITULOS[r];
+  $('back').hidden = r === 'home';
+  const app = $('app');
+  app.innerHTML = r === 'home' ? telaHome() : r === 'fisico' || r === 'mkt' ? telaCanal(r) : r === 'producao' ? telaProducao() : telaConfig();
+  if (r === 'fisico' || r === 'mkt') atualizarCanal(r);
+  window.scrollTo(0, 0);
+}
+function telaHome() {
+  const tf = taxaFalha();
+  return `
+  <div class="home-hero"><p>Escolha o canal de venda.</p></div>
+  <div class="channels">
+    <button class="channel fis" data-go="fisico"><span class="ico">⇄</span><div><b>Físico</b><br><span>Venda direta, sem taxas</span></div></button>
+    <button class="channel mkt" data-go="mkt"><span class="ico">◫</span><div><b>${esc(state.settings.mktNome || 'Marketplace')}</b><br><span>Com taxas e concorrência</span></div></button>
+  </div>
+  <div class="links">
+    <button class="link" data-go="producao"><div>Impressões e falhas<small>Taxa de falha em uso: ${pct(tf.taxa)} ${tf.real ? '(real)' : '(padrão)'}</small></div><span>›</span></button>
+    <button class="link" data-go="config"><div>Configurações<small>Filamento, energia, margens, taxas e sincronização</small></div><span>›</span></button>
+  </div>`;
+}
+function campoNum(id, lab, val, unidade, extra = '') {
+  return `<div ${extra}><label for="${id}">${lab}</label><div class="unit"><input id="${id}" type="number" inputmode="decimal" step="any" min="0" value="${val}"><em>${unidade}</em></div></div>`;
+}
+function blocoProduto() {
+  const lista = produtosAtivos(), p = produtoAtual();
+  if (!p) return `<div class="card"><div class="empty"><p>Nenhum produto cadastrado ainda.</p><button class="btn primary" data-act="novo">+ Novo produto</button></div></div>`;
+  const h = Math.floor(p.horas + 1e-9), m = Math.round((p.horas - h) * 60);
+  return `<div class="card">
+    <h2>Produto</h2>
+    <div class="row" style="margin-bottom:12px">
+      <select id="selProduto" aria-label="Produto">${lista.map(x => `<option value="${x.id}" ${x.id === p.id ? 'selected' : ''}>${esc(x.nome || 'Sem nome')}</option>`).join('')}</select>
+      <button class="btn" data-act="novo" aria-label="Novo produto">+ Novo</button>
+    </div>
+    <div class="grid">
+      <div class="full"><label for="pNome">Nome</label><input id="pNome" data-pf="nome" value="${esc(p.nome)}" placeholder="Ex.: Chaveiro flor-de-lis"></div>
+      ${campoNum('pGramas', 'Filamento', p.gramas || '', 'g').replace('<input', '<input data-pf="gramas"')}
+      ${campoNum('pManual', 'Trabalho manual', p.manualMin || '', 'min').replace('<input', '<input data-pf="manualMin"')}
+      ${campoNum('pH', 'Tempo de impressão', h || '', 'h').replace('<input', '<input data-pf="h"')}
+      ${campoNum('pM', '&nbsp;', m || '', 'min').replace('<input', '<input data-pf="m"')}
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn danger" data-act="excluir">Excluir produto</button></div>
+  </div>`;
+}
+function telaCanal(canal) {
+  const p = produtoAtual(), cls = canal === 'fisico' ? 'fis' : 'mkt';
+  let extra = '';
+  if (p && canal === 'fisico') extra = `<div class="card"><h2>Negociação</h2>
+      <div class="grid">${campoNum('nQtd', 'Quantidade', '', 'un')}${campoNum('nTotal', 'Valor combinado (total)', '', 'R$')}</div>
+      <div id="negRes"><p class="hint">Digite a quantidade e o valor total para ver se o acordo vale a pena.</p></div></div>`;
+  if (p && canal === 'mkt') extra = `<div class="card"><h2>Concorrentes</h2>
+      <label for="conc">Cole os preços de outros vendedores</label>
+      <textarea id="conc" placeholder="Ex.: 12,90  15,00  R$ 18,50">${esc(p.concorrentes)}</textarea>
+      <div id="concRes"></div></div>`;
+  return blocoProduto() + (p ? `<div class="card"><h2>Preço <span class="chip-${cls}">${canal === 'fisico' ? 'físico' : esc(state.settings.mktNome || 'marketplace')}</span></h2><div id="res"></div></div>` : '') + extra;
+}
+function atualizarCanal(canal) {
+  const p = produtoAtual(); if (!p) return;
+  const r = precos(p, canal), c = r.c, s = state.settings, cls = canal === 'fisico' ? 'fis' : 'mkt';
+  const semDados = !p.gramas && !p.horas && !p.manualMin;
+  const linhas = [['Filamento', c.filamento], ['Energia', c.energia], ['Desgaste da impressora', c.desgaste]];
+  if (s.manutencaoH) linhas.push(['Manutenção', c.manutencao]);
+  linhas.push(['Mão de obra', c.maoObra], [`Falhas (${pct(c.tf.taxa)})`, c.falha]);
+  if (s.embalagem) linhas.push(['Embalagem', s.embalagem]);
+  if (r.fixa) linhas.push([`Taxa fixa ${esc(s.mktNome)}`, r.fixa]);
+  const descTxt = canal === 'mkt'
+    ? `${s.mktTaxaPct ? `Taxa ${esc(s.mktNome)} ${s.mktTaxaPct}%` : `<b>Taxa do ${esc(s.mktNome)} não configurada</b>`}${s.imposto ? ` · imposto ${s.imposto}%` : ''}`
+    : (s.imposto ? `Imposto ${s.imposto}%` : 'Sem taxas');
+  $('res').innerHTML = `
+    ${semDados ? '<p class="hint" style="margin-top:0">Preencha o filamento e o tempo de impressão.</p>' : ''}
+    <div class="prices">
+      <div class="price min"><small>Mínimo</small><b class="num">${brl(r.minimo)}</b><span>margem ${s.margemMin}% · lucro ${brl(r.lucro(r.minimo))}</span></div>
+      <div class="price sug ${cls}"><small>Sugerido</small><b class="num">${brl(r.sugerido)}</b><span>margem ${s.margemSug}% · lucro ${brl(r.lucro(r.sugerido))}</span></div>
+    </div>
+    <p class="muted" style="margin:10px 0 0">Custo por unidade: <b class="num">${brl(r.equilibrio)}</b> · ${descTxt}</p>
+    <details><summary>Ver composição do custo</summary>
+      ${linhas.map(([k, v]) => `<div class="cost-line"><span>${k}</span><span class="num">${brl(v)}</span></div>`).join('')}
+      <div class="cost-line total"><span>Custo antes das taxas</span><span class="num">${brl(r.base)}</span></div>
+    </details>`;
+  if (canal === 'fisico') atualizarNegociacao(r);
+  if (canal === 'mkt') atualizarConcorrentes(r);
+}
+function atualizarNegociacao(r) {
+  const el = $('negRes'); if (!el) return;
+  const q = num($('nQtd').value), t = num($('nTotal').value);
+  if (!q || !t) { el.innerHTML = '<p class="hint">Digite a quantidade e o valor total para ver se o acordo vale a pena.</p>'; return; }
+  const u = t / q, lucroTot = r.lucro(u) * q;
+  let cls, tit, txt;
+  if (u < r.equilibrio) { cls = 'bad'; tit = 'Prejuízo'; txt = `Você perde ${brl(-lucroTot)} no pedido. O custo é ${brl(r.equilibrio)} por unidade.`; }
+  else if (u < r.minimo) { cls = 'warn'; tit = 'Abaixo do mínimo'; txt = `Ainda cobre o custo, mas sobra só ${brl(lucroTot)}. O mínimo seria ${brl(r.minimo * q)} (${brl(r.minimo)} cada).`; }
+  else if (u < r.sugerido) { cls = 'ok'; tit = 'Bom acordo'; txt = `Lucro de ${brl(lucroTot)} no pedido. Dentro da faixa entre o mínimo e o sugerido.`; }
+  else { cls = 'ok'; tit = 'Ótimo acordo'; txt = `Lucro de ${brl(lucroTot)} no pedido, no sugerido ou acima.`; }
+  el.innerHTML = `<p class="muted" style="margin:10px 0 0">${brl(u)} por unidade</p><div class="alert ${cls}"><b>${tit}</b>${txt}</div>`;
+}
+function atualizarConcorrentes(r) {
+  const el = $('concRes'); if (!el) return;
+  const v = parsePrecos($('conc').value);
+  if (!v.length) { el.innerHTML = '<p class="hint">Separe os preços por espaço, vírgula ou linha. O app compara com seus preços.</p>'; return; }
+  const med = mediana(v), lo = Math.min(...v), hi = Math.max(...v);
+  let cls, tit, txt;
+  if (med < r.equilibrio) { cls = 'bad'; tit = 'Mercado abaixo do seu custo'; txt = `A mediana (${brl(med)}) não cobre seu custo de ${brl(r.equilibrio)}. Reveja o produto, o material ou o canal.`; }
+  else if (med < r.minimo) { cls = 'warn'; tit = 'Concorrência abaixo do seu mínimo'; txt = `A mediana é ${brl(med)}. Vender nesse preço dá lucro de ${brl(r.lucro(med))}, abaixo da margem mínima.`; }
+  else if (med < r.sugerido) { cls = 'info'; tit = 'Seu sugerido está acima do mercado'; txt = `Um preço entre ${brl(r.minimo)} e ${brl(med)} fica competitivo e ainda passa do mínimo.`; }
+  else { cls = 'ok'; tit = 'Espaço para cobrar mais'; txt = `A mediana (${brl(med)}) está acima do seu sugerido. Dá para subir até perto de ${brl(med)}.`; }
+  const vals = [...v, r.equilibrio, r.minimo, r.sugerido].filter(isFinite);
+  const a = Math.min(...vals) * 0.9, b = Math.max(...vals) * 1.05, pos = x => ((x - a) / (b - a) * 100).toFixed(2) + '%';
+  el.innerHTML = `
+    <p class="muted" style="margin:10px 0 0">${v.length} preço${v.length > 1 ? 's' : ''} · menor ${brl(lo)} · mediana ${brl(med)} · maior ${brl(hi)}</p>
+    <div class="range" aria-hidden="true">
+      <div class="track"></div>
+      <div class="span" style="left:${pos(lo)};width:calc(${pos(hi)} - ${pos(lo)})"></div>
+      ${v.map(x => `<div class="comp" style="left:${pos(x)}"></div>`).join('')}
+      ${isFinite(r.equilibrio) ? `<div class="mk eq below" style="left:${pos(r.equilibrio)}"><i></i>custo</div>` : ''}
+      ${isFinite(r.minimo) ? `<div class="mk min" style="left:${pos(r.minimo)}">mín.<i></i></div>` : ''}
+      ${isFinite(r.sugerido) ? `<div class="mk sug" style="left:${pos(r.sugerido)}">sug.<i></i></div>` : ''}
+    </div>
+    <div class="alert ${cls}"><b>${tit}</b>${txt}</div>`;
+}
+function telaProducao() {
+  const tf = taxaFalha(), regs = registrosAtivos(), lista = produtosAtivos(), p = produtoAtual();
+  const falta = Math.max(MIN_REGISTROS - tf.n, 0);
+  return `<div class="card">
+      <h2>Taxa de falha em uso</h2>
+      <div class="stat"><b class="num">${pct(tf.taxa)}</b><span class="muted">${tf.real ? `real, de ${tf.n} impressões` : `padrão das configurações`}</span></div>
+      <p class="hint">${tf.n ? `${tf.f} falha${tf.f === 1 ? '' : 's'} em ${tf.n} registro${tf.n === 1 ? '' : 's'} (${pct(tf.f / tf.n)}).` : 'Nenhum registro ainda.'}
+      ${!tf.real && state.settings.usarFalhaReal ? ` Faltam ${falta} registro${falta === 1 ? '' : 's'} para usar a taxa real.` : ''}</p>
+    </div>
+    <div class="card">
+      <h2>Registrar impressão</h2>
+      <div class="grid">
+        <div class="full"><label for="rProd">Produto (opcional)</label><select id="rProd"><option value="">—</option>${lista.map(x => `<option value="${x.id}" ${p && x.id === p.id ? 'selected' : ''}>${esc(x.nome || 'Sem nome')}</option>`).join('')}</select></div>
+        <div class="full"><label for="rMotivo">Motivo da falha (opcional)</label><input id="rMotivo" placeholder="Ex.: descolou da mesa, erro de fatiamento"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="btn big okb" data-act="regok">✓ Deu certo</button><button class="btn big badb" data-act="regfalha">✕ Falhou</button></div>
+    </div>
+    <div class="card"><h2>Últimos registros</h2>
+      ${regs.length ? `<ul class="log">${regs.slice(0, 30).map(r => `<li><span class="tag ${r.tipo}">${r.tipo === 'ok' ? 'ok' : 'falha'}</span><div class="grow">${esc(r.produto || 'Sem produto')}${r.motivo ? ` <span class="muted">· ${esc(r.motivo)}</span>` : ''}<div class="hint">${esc(r.data)}</div></div><button class="x" data-del="${r.id}" aria-label="Apagar registro">×</button></li>`).join('')}</ul>` : '<p class="muted">Registre cada impressão, boa ou ruim. Com o tempo, o app usa a sua taxa real.</p>'}
+    </div>`;
+}
+function telaConfig() {
+  const s = state.settings, sy = state.sync, f = (k, lab, u, hint) => `<div>${campoNum('c_' + k, lab, s[k], u).replace('<input', `<input data-cf="${k}"`)}${hint ? `<p class="hint">${hint}</p>` : ''}</div>`;
+  return `<div class="card"><h2>Material e máquina</h2><div class="grid">
+      ${f('filamentoKg', 'Filamento (PLA)', 'R$/kg')}${f('potenciaW', 'Potência média', 'W', 'Média ao imprimir, não o pico')}
+      ${f('tarifaKwh', 'Tarifa de energia', 'R$/kWh', 'Confira na conta de luz')}${f('impressoraPreco', 'Preço da impressora', 'R$')}
+      ${f('vidaUtilH', 'Vida útil', 'h')}${f('manutencaoH', 'Manutenção', 'R$/h', 'Bico, mesa, peças (opcional)')}
+    </div></div>
+    <div class="card"><h2>Trabalho e falhas</h2><div class="grid">
+      ${f('maoObraH', 'Valor da sua hora', 'R$/h')}${f('falhaPadrao', 'Taxa de falha padrão', '%')}
+      <div class="full"><label><input type="checkbox" data-cf="usarFalhaReal" ${s.usarFalhaReal ? 'checked' : ''} style="width:auto;min-height:0;margin-right:8px;vertical-align:middle">Usar a taxa real depois de ${MIN_REGISTROS} registros</label></div>
+    </div></div>
+    <div class="card"><h2>Margens e custos de venda</h2><div class="grid">
+      ${f('margemSug', 'Margem sugerida', '%')}${f('margemMin', 'Margem mínima', '%')}
+      ${f('imposto', 'Imposto', '%', 'Zero enquanto não houver MEI')}${f('embalagem', 'Embalagem', 'R$/un')}
+    </div></div>
+    <div class="card"><h2>Marketplace</h2><div class="grid">
+      <div class="full"><label for="c_mktNome">Nome</label><input id="c_mktNome" data-cf="mktNome" value="${esc(s.mktNome)}"></div>
+      ${f('mktTaxaPct', 'Comissão', '%', 'Confira a taxa atual no painel do vendedor')}${f('mktTaxaFixa', 'Taxa fixa por item', 'R$')}
+    </div></div>
+    <div class="card"><h2>Sincronização (Google Sheets)</h2>
+      <div class="grid">
+        <div class="full"><label for="sUrl">Endereço do Apps Script</label><input id="sUrl" value="${esc(sy.url)}" placeholder="https://script.google.com/macros/s/.../exec"></div>
+        <div class="full"><label for="sTok">Chave de acesso</label><input id="sTok" value="${esc(sy.token)}" placeholder="A chave que aparece ao rodar a função setup"></div>
+      </div>
+      <div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn primary" data-act="salvarsync">Salvar e sincronizar</button>${sy.url ? '<button class="btn danger" data-act="desligarsync">Desconectar</button>' : ''}</div>
+      <p class="hint">Sem isso, os dados ficam só neste aparelho. O passo a passo está no arquivo LEIA-ME.</p>
+    </div>
+    <div class="card"><h2>Backup</h2><div class="row" style="flex-wrap:wrap"><button class="btn" data-act="exportar">Baixar backup</button><label class="btn" style="margin:0;color:var(--ink)">Restaurar backup<input type="file" accept="application/json" id="importar" hidden></label></div></div>`;
+}
+
+/* ================= Eventos ================= */
+document.addEventListener('click', e => {
+  const go = e.target.closest('[data-go]'); if (go) { location.hash = go.dataset.go; return; }
+  const del = e.target.closest('[data-del]');
+  if (del) { const r = state.registros.find(x => x.id === del.dataset.del); if (r && confirm('Apagar este registro?')) { r.deleted = true; r.updatedAt = Date.now(); save(true); render(); } return; }
+  const act = e.target.closest('[data-act]')?.dataset.act; if (!act) return;
+  if (act === 'novo') { const p = normProduto({ id: uid(), nome: '', updatedAt: Date.now() }); state.produtos.push(p); state.ui.produtoId = p.id; save(true); render(); $('pNome')?.focus(); }
+  if (act === 'excluir') { const p = produtoAtual(); if (p && confirm(`Excluir "${p.nome || 'Sem nome'}"? Ele some dos dois canais.`)) { p.deleted = true; p.updatedAt = Date.now(); state.ui.produtoId = null; save(true); render(); } }
+  if (act === 'regok' || act === 'regfalha') {
+    const pid = $('rProd').value, p = state.produtos.find(x => x.id === pid);
+    state.registros.push(normRegistro({ id: uid(), tipo: act === 'regok' ? 'ok' : 'falha', produtoId: pid, produto: p ? p.nome : '',
+      motivo: act === 'regfalha' ? $('rMotivo').value.trim() : '', data: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }), updatedAt: Date.now() }));
+    save(true); render(); toast(act === 'regok' ? 'Impressão registrada' : 'Falha registrada');
+  }
+  if (act === 'salvarsync') { state.sync.url = $('sUrl').value.trim(); state.sync.token = $('sTok').value.trim(); save(false); mostrarSync(); sync(true); }
+  if (act === 'desligarsync') { state.sync = { url: '', token: '' }; save(false); mostrarSync(); render(); toast('Sincronização desligada'); }
+  if (act === 'exportar') {
+    const blob = new Blob([JSON.stringify({ settings: state.settings, produtos: state.produtos, registros: state.registros }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `calc3d-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href);
+  }
+});
+document.addEventListener('input', e => {
+  const t = e.target, r = rota();
+  if (t.dataset.pf) {
+    const p = produtoAtual(); if (!p) return;
+    const k = t.dataset.pf;
+    if (k === 'nome') p.nome = t.value;
+    else if (k === 'h' || k === 'm') p.horas = num($('pH').value) + num($('pM').value) / 60;
+    else p[k] = num(t.value);
+    p.updatedAt = Date.now(); save(true);
+    if (k === 'nome') { const o = $('selProduto')?.selectedOptions[0]; if (o) o.textContent = p.nome || 'Sem nome'; }
+    atualizarCanal(r);
+  } else if (t.id === 'nQtd' || t.id === 'nTotal') { atualizarNegociacao(precos(produtoAtual(), 'fisico')); }
+  else if (t.id === 'conc') { const p = produtoAtual(); p.concorrentes = t.value; p.updatedAt = Date.now(); save(true); atualizarConcorrentes(precos(p, 'mkt')); }
+  else if (t.dataset.cf) {
+    const k = t.dataset.cf, s = state.settings;
+    s[k] = t.type === 'checkbox' ? t.checked : typeof DEFAULTS[k] === 'number' ? num(t.value) : t.value;
+    s.updatedAt = Date.now(); save(true);
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'selProduto') { state.ui.produtoId = e.target.value; save(false); render(); }
+  if (e.target.dataset.cf === 'usarFalhaReal') { state.settings.usarFalhaReal = e.target.checked; state.settings.updatedAt = Date.now(); save(true); }
+  if (e.target.id === 'importar' && e.target.files[0]) {
+    e.target.files[0].text().then(txt => {
+      const d = JSON.parse(txt);
+      if (!confirm('Substituir os dados deste aparelho pelo backup?')) return;
+      state.settings = { ...normSettings(d.settings), updatedAt: Date.now() };
+      state.produtos = (d.produtos || []).map(p => ({ ...normProduto(p), updatedAt: Date.now() }));
+      state.registros = (d.registros || []).map(r => ({ ...normRegistro(r), updatedAt: Date.now() }));
+      save(true); render(); toast('Backup restaurado');
+    }).catch(() => toast('Arquivo de backup inválido'));
+  }
+});
+$('back').onclick = () => { if (history.length > 1 && rota() !== 'home') history.back(); else location.hash = 'home'; };
+window.addEventListener('hashchange', render);
+
+/* ================= Sincronização com Google Sheets ================= */
+let syncTimer = null, syncing = false, syncAgain = false;
+function mostrarSync(estado, txt) {
+  const on = !!state.sync.url; $('sync').hidden = !on; if (!on) return;
+  $('syncDot').className = 'dot ' + (estado || '');
+  $('syncTxt').textContent = txt || (estado === 'ok' ? 'Sincronizado' : estado === 'sync' ? 'Sincronizando' : estado === 'erro' ? 'Sem conexão' : 'Sheets');
+}
+function scheduleSync() { if (!state.sync.url) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => sync(false), 1500); }
+function mergeLista(local, remoto, norm) {
+  const m = new Map(local.map(x => [x.id, x]));
+  (remoto || []).map(norm).forEach(x => { if (!x.id || x.id === 'undefined') return; const cur = m.get(x.id); if (!cur || x.updatedAt > cur.updatedAt) m.set(x.id, x); });
+  return [...m.values()];
+}
+async function sync(manual) {
+  const { url, token } = state.sync; if (!url) return;
+  if (syncing) { syncAgain = true; return; }
+  syncing = true; mostrarSync('sync');
+  try {
+    const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token), { cache: 'no-store' });
+    const remoto = await res.json();
+    if (remoto.error) throw new Error(remoto.error);
+    const antes = JSON.stringify([state.settings, state.produtos, state.registros]);
+    if (remoto.settings && num(remoto.settings.updatedAt) > state.settings.updatedAt) state.settings = normSettings(remoto.settings);
+    state.produtos = mergeLista(state.produtos, remoto.produtos, normProduto);
+    state.registros = mergeLista(state.registros, remoto.registros, normRegistro);
+    save(false);
+    const post = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ token, data: { settings: state.settings, produtos: state.produtos, registros: state.registros } }) });
+    const ok = await post.json();
+    if (!ok.ok) throw new Error(ok.error || 'falha ao salvar');
+    mostrarSync('ok');
+    if (manual) toast('Sincronizado com a planilha');
+    const mudou = antes !== JSON.stringify([state.settings, state.produtos, state.registros]);
+    const digitando = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (mudou && (!digitando || manual)) render();
+  } catch (err) {
+    mostrarSync('erro');
+    if (manual) toast('Não consegui sincronizar: ' + (err.message === 'chave inválida' ? 'chave inválida' : 'confira o endereço'));
+  } finally {
+    syncing = false;
+    if (syncAgain) { syncAgain = false; scheduleSync(); }
+  }
+}
+window.addEventListener('focus', () => scheduleSync());
+window.addEventListener('online', () => scheduleSync());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleSync(); });
+
+/* ================= Início ================= */
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+mostrarSync();
+render();
+if (state.sync.url) sync(false);
+</script>
+</body>
+</html>
