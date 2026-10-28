@@ -1,6 +1,6 @@
 // Guarda o app no aparelho para abrir rápido e funcionar offline.
 // Ao mudar qualquer arquivo do app, aumente a versão abaixo.
-const VERSAO = 'calc3d-v2';
+const VERSAO = 'calc3d-v4';
 const ARQUIVOS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -20,8 +20,9 @@ self.addEventListener('fetch', e => {
   // A planilha (Google) sempre vai direto para a rede.
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
   // Rede primeiro (pega atualizações), cache se estiver offline.
+  // no-cache: sempre confere no GitHub se o arquivo mudou, sem esperar o cache de 10 min.
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' })
       .then(res => {
         const copia = res.clone();
         caches.open(VERSAO).then(c => c.put(e.request, copia));

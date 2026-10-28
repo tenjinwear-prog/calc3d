@@ -129,6 +129,37 @@ details summary{cursor:pointer;font-size:14px;color:var(--ink-2);padding:10px 0 
 .seg{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px}
 .seg button{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:8px 16px;font:inherit;font-weight:600;cursor:pointer;min-height:40px}
 .seg button[aria-selected="true"]{background:var(--mkt-soft);border-color:var(--mkt);color:var(--mkt)}
+.fin-link{border-color:var(--ink-2)}
+.mesnav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.mesnav b{font-size:18px;letter-spacing:-.01em}
+.mesnav .back:disabled{opacity:.35;cursor:default}
+.fin-hero{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fin-hero .big{border-radius:14px;padding:16px 14px;background:var(--surface-2);min-width:0}
+.fin-hero .big small{display:block;font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em;font-weight:650}
+.fin-hero .big b{display:block;font-size:34px;letter-spacing:-.02em;margin:6px 0 2px;white-space:nowrap}
+@media (max-width:520px){.fin-hero{grid-template-columns:1fr}.fin-hero .big{display:grid;grid-template-columns:1fr auto;align-items:baseline;column-gap:12px}.fin-hero .big small{grid-column:1/-1}.fin-hero .big b{font-size:32px;margin:4px 0 0}.fin-hero .big span{text-align:right}}
+.fin-hero .big span{font-size:12px;color:var(--ink-2)}
+.fin-hero .lucro{background:var(--ok-soft)} .fin-hero .lucro b{color:var(--ok)}
+.fin-hero .lucro.neg{background:var(--bad-soft)} .fin-hero .lucro.neg b{color:var(--bad)}
+.fin-hero .saldo{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;padding:4px 4px 0;font-size:14px;color:var(--ink-2)}
+.fin-hero .saldo b{font-size:17px;color:var(--ink)}
+.neg{color:var(--bad)!important} .pos{color:var(--ok)}
+.fbar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface-2);margin:2px 0 12px;gap:2px}
+.fbar span{display:block;min-width:3px}
+.c1{background:var(--ink-2)} .c2{background:var(--mkt)} .c3{background:var(--warn)} .c4{background:var(--ok)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:baseline}
+.cost-line em{font-style:normal;font-size:12px;color:var(--ink-2);margin-left:4px}
+.fin-acts{margin-bottom:14px}
+.log li.tap{cursor:pointer}
+.log li.tap:hover{background:var(--surface-2)}
+.log .dia{font-size:13px;color:var(--ink-2);width:40px;flex:0 0 auto}
+.log .val{font-weight:650;white-space:nowrap}
+.tag.cont,.tag.ext{white-space:nowrap;text-transform:none;letter-spacing:0;font-size:12px;font-weight:600}
+.tag.cont{background:var(--surface-2);color:var(--ink-2)} .tag.ext{background:var(--warn-soft);color:var(--warn)}
+.fform{border:2px solid var(--ink);scroll-margin-top:72px}
+.fbtns{margin-top:14px;flex-wrap:wrap}
+.chk{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:15px;cursor:pointer}
+.chk input{width:22px;height:22px;min-height:0;flex:0 0 auto}
 .chip-fis{color:var(--fis);font-weight:700} .chip-mkt{color:var(--mkt);font-weight:700}
 @media (max-width:380px){.prices{grid-template-columns:1fr}.price b{font-size:24px}}
 </style>
@@ -158,7 +189,7 @@ const DEFAULTS = {
 };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.')); return isFinite(n) ? n : 0; };
-const bool = v => v === true || v === 'true' || v === 'TRUE';
+const bool = v => v === true || String(v ?? '').trim().toLowerCase() === 'true';
 // Listas chegam da planilha como texto JSON; aqui viram listas de novo.
 function lista(v) {
   if (Array.isArray(v)) return v;
@@ -172,9 +203,21 @@ function normalize(s) {
     settings: normSettings(s.settings),
     produtos: (s.produtos || []).map(normProduto),
     registros: (s.registros || []).map(normRegistro),
+    vendas: (s.vendas || []).map(normVenda),
+    despesas: (s.despesas || []).map(normDespesa),
     sync: { url: '', token: '', ...(s.sync || {}) },
-    ui: { produtoId: null, plataformaId: null, ...(s.ui || {}) }
+    ui: { produtoId: null, plataformaId: null, mes: null, ...(s.ui || {}) }
   };
+}
+function normItem(i) { return { produtoId: String(i.produtoId ?? ''), nome: String(i.nome ?? ''), qtd: num(i.qtd), custoUnit: num(i.custoUnit) }; }
+function normVenda(v) {
+  return { id: String(v.id), data: String(v.data ?? '').slice(0, 10), descricao: String(v.descricao ?? ''), canal: String(v.canal ?? 'fisico'),
+    canalNome: String(v.canalNome ?? ''), itens: (lista(v.itens) || []).map(normItem), valor: num(v.valor), taxas: num(v.taxas),
+    updatedAt: num(v.updatedAt), deleted: bool(v.deleted) };
+}
+function normDespesa(d) {
+  return { id: String(d.id), data: String(d.data ?? '').slice(0, 10), descricao: String(d.descricao ?? ''), categoria: String(d.categoria ?? 'Outros'),
+    valor: num(d.valor), contado: bool(d.contado), updatedAt: num(d.updatedAt), deleted: bool(d.deleted) };
 }
 function normMaterial(m) { return { fid: String(m.fid ?? ''), g: num(m.g) }; }
 function normProduto(p) {
@@ -216,9 +259,12 @@ function paraPlanilha() {
   return {
     settings: { ...s, filamentos: JSON.stringify(s.filamentos), plataformas: JSON.stringify(s.plataformas) },
     produtos: state.produtos.map(p => ({ ...p, materiais: JSON.stringify(p.materiais) })),
-    registros: state.registros
+    registros: state.registros,
+    vendas: state.vendas.map(v => ({ ...v, itens: JSON.stringify(v.itens) })),
+    despesas: state.despesas
   };
 }
+const dadosSync = () => JSON.stringify([state.settings, state.produtos, state.registros, state.vendas, state.despesas]);
 let state = (() => { try { return normalize(JSON.parse(localStorage.getItem(LS_KEY))); } catch (e) { return normalize(); } })();
 function save(changed) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
@@ -275,19 +321,19 @@ function parsePrecos(txt) {
 const mediana = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 /* ================= Telas ================= */
-const TITULOS = { home: 'Calculadora 3D', fisico: 'Venda física', mkt: 'Marketplace', producao: 'Impressões e falhas', config: 'Configurações' };
+const TITULOS = { home: 'Calculadora 3D', fisico: 'Venda física', mkt: 'Marketplace', financas: 'Finanças', producao: 'Impressões e falhas', config: 'Configurações' };
 function rota() { const r = location.hash.slice(1); return TITULOS[r] ? r : 'home'; }
 function render() {
   const r = rota();
   $('title').textContent = r === 'mkt' ? nomePlataforma() : TITULOS[r];
   $('back').hidden = r === 'home';
   const app = $('app');
-  app.innerHTML = r === 'home' ? telaHome() : r === 'fisico' || r === 'mkt' ? telaCanal(r) : r === 'producao' ? telaProducao() : telaConfig();
+  app.innerHTML = r === 'home' ? telaHome() : r === 'fisico' || r === 'mkt' ? telaCanal(r) : r === 'financas' ? telaFinancas() : r === 'producao' ? telaProducao() : telaConfig();
   if (r === 'fisico' || r === 'mkt') atualizarCanal(r);
   window.scrollTo(0, 0);
 }
 function telaHome() {
-  const tf = taxaFalha();
+  const tf = taxaFalha(), fm = resumoMes(mesHoje());
   return `
   <div class="home-hero"><p>Escolha o canal de venda.</p></div>
   <div class="channels">
@@ -295,6 +341,9 @@ function telaHome() {
     <button class="channel mkt" data-go="mkt"><span class="ico">◫</span><div><b>${esc(nomePlataforma())}</b><br><span>${state.settings.plataformas.length > 1 ? `Marketplace · ${state.settings.plataformas.length} plataformas` : 'Com taxas e concorrência'}</span></div></button>
   </div>
   <div class="links">
+    <button class="link fin-link" data-go="financas"><div>Finanças<small>${fm.nVendas || fm.nDespesas
+      ? `${nomeMes(mesHoje())}: faturamento ${brl(fm.faturamento)} · lucro ${brl(fm.lucro)}`
+      : 'Vendas, despesas e lucro do mês'}</small></div><span>›</span></button>
     <button class="link" data-go="producao"><div>Impressões e falhas<small>Taxa de falha em uso: ${pct(tf.taxa)} ${tf.real ? '(real)' : '(padrão)'}</small></div><span>›</span></button>
     <button class="link" data-go="config"><div>Configurações<small>Filamentos, plataformas, margens e sincronização</small></div><span>›</span></button>
   </div>`;
@@ -396,7 +445,8 @@ function atualizarNegociacao(r) {
   else if (u < r.minimo) { cls = 'warn'; tit = 'Abaixo do mínimo'; txt = `Ainda cobre o custo, mas sobra só ${brl(lucroTot)}. O mínimo seria ${brl(r.minimo * q)} (${brl(r.minimo)} cada).`; }
   else if (u < r.sugerido) { cls = 'ok'; tit = 'Bom acordo'; txt = `Lucro de ${brl(lucroTot)} no pedido. Dentro da faixa entre o mínimo e o sugerido.`; }
   else { cls = 'ok'; tit = 'Ótimo acordo'; txt = `Lucro de ${brl(lucroTot)} no pedido, no sugerido ou acima.`; }
-  el.innerHTML = `<p class="muted" style="margin:10px 0 0">${brl(u)} por unidade</p><div class="alert ${cls}"><b>${tit}</b>${txt}</div>`;
+  el.innerHTML = `<p class="muted" style="margin:10px 0 0">${brl(u)} por unidade</p><div class="alert ${cls}"><b>${tit}</b>${txt}</div>
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn primary" data-fin="regneg">Registrar venda</button></div>`;
 }
 function atualizarConcorrentes(r) {
   const el = $('concRes'); if (!el) return;
@@ -490,9 +540,229 @@ function telaConfig() {
     <div class="card"><h2>Backup</h2><div class="row" style="flex-wrap:wrap"><button class="btn" data-act="exportar">Baixar backup</button><label class="btn" style="margin:0;color:var(--ink)">Restaurar backup<input type="file" accept="application/json" id="importar" hidden></label></div></div>`;
 }
 
+/* ================= Finanças ================= */
+const CATEGORIAS = [
+  { nome: 'Filamento', contado: true }, { nome: 'Energia', contado: true }, { nome: 'Peças e manutenção', contado: true },
+  { nome: 'Embalagem', contado: null }, { nome: 'Frete', contado: false }, { nome: 'Anúncio', contado: false },
+  { nome: 'Impostos e MEI', contado: false }, { nome: 'Ferramentas', contado: false }, { nome: 'Outros', contado: false }
+];
+// Embalagem só é "já contada" quando ela tem valor nas Configurações.
+const categoriaContada = c => { const x = CATEGORIAS.find(k => k.nome === c); return x ? (x.contado === null ? state.settings.embalagem > 0 : x.contado) : false; };
+const pad2 = n => String(n).padStart(2, '0');
+const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const mesHoje = () => hoje().slice(0, 7);
+const mesAtual = () => /^\d{4}-\d{2}$/.test(state.ui.mes || '') ? state.ui.mes : mesHoje();
+function nomeMes(m) {
+  const [y, mm] = m.split('-').map(Number);
+  const t = new Date(y, mm - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function somaMes(m, delta) { let [y, mm] = m.split('-').map(Number); mm += delta; while (mm < 1) { mm += 12; y--; } while (mm > 12) { mm -= 12; y++; } return `${y}-${pad2(mm)}`; }
+const diaMes = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '';
+const vendasAtivas = () => state.vendas.filter(v => !v.deleted);
+const despesasAtivas = () => state.despesas.filter(d => !d.deleted);
+const custoVenda = v => v.itens.reduce((t, i) => t + i.qtd * i.custoUnit, 0);
+const qtdVenda = v => v.itens.reduce((t, i) => t + i.qtd, 0);
+const lucroVenda = v => v.valor - custoVenda(v) - v.taxas;
+// Custo de 1 unidade pelo app: produção com falhas + embalagem. Fica guardado na venda.
+const custoUnitario = p => custo(p).ajustado + state.settings.embalagem;
+function nomeCanal(c) { if (c === 'fisico') return 'Físico'; const p = state.settings.plataformas.find(x => x.id === c); return p ? p.nome || 'Marketplace' : ''; }
+function taxasSugeridas(canal, valor, qtd) {
+  const s = state.settings, p = canal === 'fisico' ? null : state.settings.plataformas.find(x => x.id === canal);
+  return valor * s.imposto / 100 + (p ? valor * p.taxaPct / 100 + p.taxaFixa * qtd : 0);
+}
+function resumoMes(m) {
+  const vs = vendasAtivas().filter(v => v.data.startsWith(m)), ds = despesasAtivas().filter(d => d.data.startsWith(m));
+  const faturamento = vs.reduce((t, v) => t + v.valor, 0), producao = vs.reduce((t, v) => t + custoVenda(v), 0);
+  const maoObra = vs.reduce((t, v) => t + v.itens.reduce((x, i) => { const p = state.produtos.find(k => k.id === i.produtoId); return x + (p ? i.qtd * p.manualMin / 60 * state.settings.maoObraH : 0); }, 0), 0);
+  const taxas = vs.reduce((t, v) => t + v.taxas, 0);
+  const extras = ds.filter(d => !d.contado).reduce((t, d) => t + d.valor, 0), estoque = ds.filter(d => d.contado).reduce((t, d) => t + d.valor, 0);
+  return { vs, ds, nVendas: vs.length, nDespesas: ds.length, faturamento, producao, maoObra, taxas, extras, estoque,
+    lucro: faturamento - producao - taxas - extras, saldo: faturamento - taxas - extras - estoque };
+}
+
+let finForm = null; // formulário aberto: { tipo: 'venda' | 'despesa', d: rascunho, editando: id | null }
+function novaVenda(pre) {
+  const p = produtoAtual();
+  const itens = pre?.itens || [p ? { produtoId: p.id, nome: p.nome, qtd: 1, custoUnit: custoUnitario(p) } : { produtoId: '', nome: '', qtd: 1, custoUnit: 0 }];
+  const d = { id: uid(), data: hoje(), descricao: '', canal: pre?.canal || 'fisico', itens, valor: pre?.valor || 0, taxas: 0, taxaManual: false };
+  d.taxas = taxasSugeridas(d.canal, d.valor, itens.reduce((t, i) => t + i.qtd, 0));
+  return d;
+}
+function telaFinancas() {
+  const m = mesAtual(), r = resumoMes(m);
+  const lucroCls = r.lucro < 0 ? 'neg' : '';
+  // Barra: de onde vem cada real do faturamento.
+  const partes = [['Custo de produção', r.producao, 'c1'], ['Taxas', r.taxas, 'c2'], ['Despesas extras', r.extras, 'c3'], ['Lucro', Math.max(r.lucro, 0), 'c4']];
+  const base = Math.max(r.faturamento, r.producao + r.taxas + r.extras);
+  const barra = base > 0 ? `<div class="fbar" role="img" aria-label="Divisão do faturamento">${partes.filter(x => x[1] > 0).map(([n, v, c]) => `<span class="${c}" style="width:${(v / base * 100).toFixed(2)}%" title="${n}: ${brl(v)}"></span>`).join('')}</div>` : '';
+  const pctFat = v => r.faturamento > 0 ? ` <em>${pct(v / r.faturamento)}</em>` : '';
+  return `
+  <div class="mesnav">
+    <button class="back" data-fin="mesant" aria-label="Mês anterior">‹</button>
+    <b>${nomeMes(m)}</b>
+    <button class="back" data-fin="mesprox" aria-label="Próximo mês" ${m >= mesHoje() ? 'disabled' : ''}>›</button>
+  </div>
+  <div class="card fin-hero">
+    <div class="big"><small>Faturamento</small><b class="num">${brl(r.faturamento)}</b><span>${r.nVendas} venda${r.nVendas === 1 ? '' : 's'}</span></div>
+    <div class="big lucro ${lucroCls}"><small>Lucro</small><b class="num">${brl(r.lucro)}</b><span>${r.faturamento > 0 ? `margem ${pct(r.lucro / r.faturamento)}` : 'das vendas do mês'}</span></div>
+    <div class="saldo"><span>Saldo real do mês</span><b class="num ${r.saldo < 0 ? 'neg' : ''}">${brl(r.saldo)}</b></div>
+  </div>
+  <div class="card">
+    <h2>De onde vem o lucro</h2>
+    ${barra}
+    <div class="cost-line"><span>Faturamento</span><span class="num">${brl(r.faturamento)}</span></div>
+    <div class="cost-line"><span><i class="sw c1"></i>− Custo de produção${pctFat(r.producao)}</span><span class="num">${brl(r.producao)}</span></div>
+    <div class="cost-line"><span><i class="sw c2"></i>− Taxas e impostos${pctFat(r.taxas)}</span><span class="num">${brl(r.taxas)}</span></div>
+    <div class="cost-line"><span><i class="sw c3"></i>− Despesas extras${pctFat(r.extras)}</span><span class="num">${brl(r.extras)}</span></div>
+    <div class="cost-line total"><span><i class="sw c4"></i>= Lucro</span><span class="num">${brl(r.lucro)}</span></div>
+    <p class="hint">O custo de produção vem do app: filamento, energia, desgaste, falhas e embalagem${r.maoObra > 0 ? `, mais ${brl(r.maoObra)} da sua mão de obra (R$ ${state.settings.maoObraH}/h)` : ' e sua mão de obra'}.</p>
+    <div class="cost-line total" style="margin-top:14px"><span>Saldo real do mês</span><span class="num">${brl(r.saldo)}</span></div>
+    <p class="hint">Faturamento − taxas − despesas extras − compras que o app já conta no custo (${brl(r.estoque)} em filamento, energia e peças). É o dinheiro que realmente sobrou.</p>
+  </div>
+  <div class="row fin-acts">
+    <button class="btn big okb" data-fin="novavenda">+ Venda</button>
+    <button class="btn big" data-fin="novadespesa">+ Despesa</button>
+  </div>
+  ${finForm ? formFin() : ''}
+  <div class="card"><h2>Vendas</h2>
+    ${r.vs.length ? `<ul class="log">${r.vs.sort((a, b) => b.data.localeCompare(a.data) || b.updatedAt - a.updatedAt).map(v => {
+      const l = lucroVenda(v);
+      return `<li class="tap" data-fin="editvenda" data-id="${v.id}"><span class="dia num">${diaMes(v.data)}</span><div class="grow">${esc(v.descricao || v.itens.map(i => i.nome).filter(Boolean).join(', ') || 'Venda')}
+        <div class="hint">${esc(nomeCanal(v.canal) || v.canalNome)} · ${qtdVenda(v).toLocaleString('pt-BR')} un · lucro <b class="${l < 0 ? 'neg' : 'pos'}">${brl(l)}</b></div></div>
+        <span class="num val">${brl(v.valor)}</span></li>`; }).join('')}</ul>`
+      : `<p class="muted">Nenhuma venda em ${nomeMes(m).toLowerCase()}. Toque em <b>+ Venda</b> ou use <b>Registrar venda</b> na negociação da venda física.</p>`}
+  </div>
+  <div class="card"><h2>Despesas</h2>
+    ${r.ds.length ? `<ul class="log">${r.ds.sort((a, b) => b.data.localeCompare(a.data) || b.updatedAt - a.updatedAt).map(d => `<li class="tap" data-fin="editdespesa" data-id="${d.id}"><span class="dia num">${diaMes(d.data)}</span><div class="grow">${esc(d.descricao || d.categoria)}
+        <div class="hint">${esc(d.categoria)} · <span class="tag ${d.contado ? 'cont' : 'ext'}">${d.contado ? 'contado no app' : 'extra'}</span></div></div>
+        <span class="num val">${brl(d.valor)}</span></li>`).join('')}</ul>`
+      : '<p class="muted">Nenhuma despesa lançada neste mês.</p>'}
+  </div>`;
+}
+function formFin() {
+  const f = finForm, d = f.d;
+  if (f.tipo === 'despesa') return `<div class="card fform" id="fform"><h2>${f.editando ? 'Editar despesa' : 'Nova despesa'}</h2>
+    <div class="grid">
+      <div><label for="dData">Data</label><input id="dData" type="date" data-df="data" value="${d.data}"></div>
+      ${campoNum('dValor', 'Valor', d.valor || '', 'R$').replace('<input', '<input data-df="valor"')}
+      <div class="full"><label for="dCat">Categoria</label><select id="dCat" data-df="categoria">${CATEGORIAS.map(c => `<option ${c.nome === d.categoria ? 'selected' : ''}>${c.nome}</option>`).join('')}</select></div>
+      <div class="full"><label for="dDesc">Descrição</label><input id="dDesc" data-df="descricao" value="${esc(d.descricao)}" placeholder="Ex.: 2 carretéis PLA preto"></div>
+      <div class="full"><label class="chk"><input type="checkbox" id="dCont" data-df="contado" ${d.contado ? 'checked' : ''}>O app já conta isso no custo das peças</label>
+        <p class="hint">Marcado: entra só no saldo real, para não contar duas vezes. Desmarcado: é uma despesa extra e também sai do lucro.</p></div>
+    </div>
+    <div class="row fbtns"><button class="btn primary" data-fin="salvar">Salvar</button><button class="btn" data-fin="cancelar">Cancelar</button>${f.editando ? '<button class="btn danger" data-fin="excluir">Excluir</button>' : ''}</div>
+  </div>`;
+  const prods = produtosAtivos(), qtd = d.itens.reduce((t, i) => t + i.qtd, 0), custoT = d.itens.reduce((t, i) => t + i.qtd * i.custoUnit, 0);
+  const canais = [['fisico', 'Físico'], ...state.settings.plataformas.map(p => [p.id, p.nome || 'Marketplace'])];
+  return `<div class="card fform" id="fform"><h2>${f.editando ? 'Editar venda' : 'Nova venda'}</h2>
+    <div class="grid">
+      <div><label for="vData">Data</label><input id="vData" type="date" data-vf="data" value="${d.data}"></div>
+      <div><label for="vCanal">Canal</label><select id="vCanal" data-vf="canal">${canais.map(([id, n]) => `<option value="${id}" ${id === d.canal ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+      <div class="full"><label for="vDesc">Cliente ou descrição</label><input id="vDesc" data-vf="descricao" value="${esc(d.descricao)}" placeholder="Ex.: Grupo escoteiro"></div>
+      <div class="full"><label>Produtos</label>
+        <div class="mats">${d.itens.map((it, i) => `<div class="mat">
+          <select id="vp${i}" data-vi="${i}" data-k="produtoId" aria-label="Produto ${i + 1}">
+            ${it.produtoId && !prods.some(p => p.id === it.produtoId) ? `<option value="${it.produtoId}" selected>${esc(it.nome || 'Produto removido')}</option>` : ''}
+            ${prods.length ? '' : '<option value="">Cadastre um produto primeiro</option>'}
+            ${prods.map(p => `<option value="${p.id}" ${p.id === it.produtoId ? 'selected' : ''}>${esc(p.nome || 'Sem nome')}</option>`).join('')}</select>
+          <div class="unit"><input id="vq${i}" data-vi="${i}" data-k="qtd" type="number" inputmode="numeric" min="0" step="1" value="${it.qtd || ''}" aria-label="Quantidade ${i + 1}"><em>un</em></div>
+          ${d.itens.length > 1 ? `<button class="x" data-fin="rmitem" data-i="${i}" aria-label="Remover produto ${i + 1}">×</button>` : ''}
+        </div>`).join('')}</div>
+        <div class="row" style="justify-content:space-between;margin-top:8px;flex-wrap:wrap">
+          <button class="btn" data-fin="additem">+ Outro produto</button>
+          <span class="muted num" id="vCusto">Custo de produção: ${brl(custoT)}</span>
+        </div>
+      </div>
+      ${campoNum('vValor', 'Valor recebido (total)', d.valor || '', 'R$').replace('<input', '<input data-vf="valor"')}
+      <div>${campoNum('vTaxas', 'Taxas e impostos', d.taxas ? +d.taxas.toFixed(2) : '', 'R$').replace('<input', '<input data-vf="taxas"')}
+        <p class="hint" id="vTaxaHint">${d.taxaManual ? 'Valor digitado por você' : 'Calculado pelas Configurações'}</p></div>
+    </div>
+    <div id="vPrev">${previaVenda(d, qtd, custoT)}</div>
+    <div class="row fbtns"><button class="btn primary" data-fin="salvar">Salvar</button><button class="btn" data-fin="cancelar">Cancelar</button>${f.editando ? '<button class="btn danger" data-fin="excluir">Excluir</button>' : ''}</div>
+  </div>`;
+}
+function previaVenda(d, qtd, custoT) {
+  if (!d.valor) return '<p class="hint">Digite o valor recebido para ver o lucro desta venda.</p>';
+  const l = d.valor - custoT - d.taxas;
+  const cls = l < 0 ? 'bad' : 'ok';
+  return `<div class="alert ${cls}"><b>Lucro desta venda: ${brl(l)}</b>${qtd ? `${brl(d.valor / qtd)} por unidade · ` : ''}custo ${brl(custoT)} · taxas ${brl(d.taxas)}</div>`;
+}
+function atualizarFormVenda() {
+  const d = finForm.d, qtd = d.itens.reduce((t, i) => t + i.qtd, 0), custoT = d.itens.reduce((t, i) => t + i.qtd * i.custoUnit, 0);
+  if (!d.taxaManual) { d.taxas = taxasSugeridas(d.canal, d.valor, qtd); const t = $('vTaxas'); if (t && document.activeElement !== t) t.value = d.taxas ? +d.taxas.toFixed(2) : ''; }
+  $('vCusto').textContent = 'Custo de produção: ' + brl(custoT);
+  $('vPrev').innerHTML = previaVenda(d, qtd, custoT);
+}
+function finClick(acao, el) {
+  if (acao === 'mesant' || acao === 'mesprox') { state.ui.mes = somaMes(mesAtual(), acao === 'mesant' ? -1 : 1); finForm = null; save(false); render(); return; }
+  if (acao === 'novavenda') { finForm = { tipo: 'venda', d: novaVenda(), editando: null }; render(); $('fform')?.scrollIntoView({ block: 'start' }); return; }
+  if (acao === 'novadespesa') { finForm = { tipo: 'despesa', d: { id: uid(), data: hoje(), descricao: '', categoria: 'Filamento', valor: 0, contado: true }, editando: null }; render(); $('fform')?.scrollIntoView({ block: 'start' }); return; }
+  if (acao === 'editvenda' || acao === 'editdespesa') {
+    const lst = acao === 'editvenda' ? state.vendas : state.despesas, x = lst.find(k => k.id === el.dataset.id); if (!x) return;
+    const d = JSON.parse(JSON.stringify(x));
+    if (acao === 'editvenda') d.taxaManual = Math.abs(d.taxas - taxasSugeridas(d.canal, d.valor, qtdVenda(d))) > 0.005;
+    finForm = { tipo: acao === 'editvenda' ? 'venda' : 'despesa', d, editando: x.id }; render(); $('fform')?.scrollIntoView({ block: 'start' }); return;
+  }
+  if (acao === 'regneg') {
+    const p = produtoAtual(); if (!p) return;
+    const q = num($('nQtd').value), t = num($('nTotal').value);
+    finForm = { tipo: 'venda', d: novaVenda({ canal: 'fisico', valor: t, itens: [{ produtoId: p.id, nome: p.nome, qtd: q, custoUnit: custoUnitario(p) }] }), editando: null };
+    state.ui.mes = mesHoje(); save(false);
+    location.hash = 'financas'; return;
+  }
+  if (acao === 'cancelar') { finForm = null; render(); return; }
+  if (acao === 'additem') { const p = produtosAtivos()[0]; finForm.d.itens.push({ produtoId: p?.id || '', nome: p?.nome || '', qtd: 1, custoUnit: p ? custoUnitario(p) : 0 }); render(); $('fform')?.scrollIntoView({ block: 'start' }); return; }
+  if (acao === 'rmitem') { finForm.d.itens.splice(num(el.dataset.i), 1); render(); $('fform')?.scrollIntoView({ block: 'start' }); return; }
+  if (acao === 'salvar') {
+    const f = finForm, d = f.d;
+    if (!d.valor) { toast('Digite o valor'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.data)) d.data = hoje();
+    if (f.tipo === 'venda') {
+      d.itens = d.itens.filter(i => i.qtd > 0);
+      const v = normVenda({ ...d, canalNome: nomeCanal(d.canal), updatedAt: Date.now() });
+      const i = state.vendas.findIndex(k => k.id === v.id); if (i >= 0) state.vendas[i] = v; else state.vendas.push(v);
+    } else {
+      const x = normDespesa({ ...d, updatedAt: Date.now() });
+      const i = state.despesas.findIndex(k => k.id === x.id); if (i >= 0) state.despesas[i] = x; else state.despesas.push(x);
+    }
+    state.ui.mes = d.data.slice(0, 7); finForm = null; save(true); render(); toast(f.tipo === 'venda' ? 'Venda salva' : 'Despesa salva'); return;
+  }
+  if (acao === 'excluir') {
+    const f = finForm, lst = f.tipo === 'venda' ? state.vendas : state.despesas, x = lst.find(k => k.id === f.editando);
+    if (x && confirm(f.tipo === 'venda' ? 'Excluir esta venda?' : 'Excluir esta despesa?')) { x.deleted = true; x.updatedAt = Date.now(); finForm = null; save(true); render(); }
+  }
+}
+function finInput(t) {
+  const d = finForm?.d; if (!d) return false;
+  if (t.dataset.df) {
+    const k = t.dataset.df;
+    if (k === 'contado') d.contado = t.checked;
+    else if (k === 'valor') d.valor = num(t.value);
+    else d[k] = t.value;
+    if (k === 'categoria') { d.contado = categoriaContada(t.value); $('dCont').checked = d.contado; }
+    return true;
+  }
+  if (t.dataset.vf) {
+    const k = t.dataset.vf;
+    if (k === 'valor') d.valor = num(t.value);
+    else if (k === 'taxas') { d.taxas = num(t.value); d.taxaManual = t.value !== ''; $('vTaxaHint').textContent = d.taxaManual ? 'Valor digitado por você' : 'Calculado pelas Configurações'; }
+    else d[k] = t.value;
+    atualizarFormVenda(); return true;
+  }
+  if (t.dataset.vi !== undefined) {
+    const it = d.itens[num(t.dataset.vi)];
+    if (t.dataset.k === 'qtd') it.qtd = num(t.value);
+    else { const p = state.produtos.find(x => x.id === t.value); it.produtoId = t.value; it.nome = p?.nome || ''; it.custoUnit = p ? custoUnitario(p) : 0; }
+    atualizarFormVenda(); return true;
+  }
+  return false;
+}
+
 /* ================= Eventos ================= */
 document.addEventListener('click', e => {
-  const go = e.target.closest('[data-go]'); if (go) { location.hash = go.dataset.go; return; }
+  const go = e.target.closest('[data-go]'); if (go) { finForm = null; location.hash = go.dataset.go; return; }
+  const fin = e.target.closest('[data-fin]'); if (fin) { finClick(fin.dataset.fin, fin); return; }
   const plat = e.target.closest('[data-plat]');
   if (plat) { state.ui.plataformaId = plat.dataset.plat; save(false); render(); return; }
   const del = e.target.closest('[data-del]');
@@ -532,12 +802,13 @@ document.addEventListener('click', e => {
   if (act === 'salvarsync') { state.sync.url = $('sUrl').value.trim(); state.sync.token = $('sTok').value.trim(); save(false); mostrarSync(); sync(true); }
   if (act === 'desligarsync') { state.sync = { url: '', token: '' }; save(false); mostrarSync(); render(); toast('Sincronização desligada'); }
   if (act === 'exportar') {
-    const blob = new Blob([JSON.stringify({ settings: state.settings, produtos: state.produtos, registros: state.registros }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ settings: state.settings, produtos: state.produtos, registros: state.registros, vendas: state.vendas, despesas: state.despesas }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `calc3d-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href);
   }
 });
 document.addEventListener('input', e => {
   const t = e.target, r = rota();
+  if (r === 'financas' && finInput(t)) return;
   if (t.dataset.mf !== undefined || t.dataset.mg !== undefined) {
     const p = produtoAtual(); if (!p) return;
     const i = num(t.dataset.mf ?? t.dataset.mg);
@@ -577,12 +848,18 @@ document.addEventListener('change', e => {
       state.settings = { ...normSettings(d.settings), updatedAt: Date.now() };
       state.produtos = (d.produtos || []).map(p => ({ ...normProduto(p), updatedAt: Date.now() }));
       state.registros = (d.registros || []).map(r => ({ ...normRegistro(r), updatedAt: Date.now() }));
+      state.vendas = (d.vendas || []).map(v => ({ ...normVenda(v), updatedAt: Date.now() }));
+      state.despesas = (d.despesas || []).map(x => ({ ...normDespesa(x), updatedAt: Date.now() }));
       save(true); render(); toast('Backup restaurado');
     }).catch(() => toast('Arquivo de backup inválido'));
   }
 });
 $('back').onclick = () => { if (history.length > 1 && rota() !== 'home') history.back(); else location.hash = 'home'; };
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => {
+  if (rota() !== 'financas') finForm = null;
+  render();
+  if (finForm) $('fform')?.scrollIntoView({ block: 'start' });
+});
 
 /* ================= Sincronização com Google Sheets ================= */
 let syncTimer = null, syncing = false, syncAgain = false;
@@ -605,10 +882,12 @@ async function sync(manual) {
     const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token), { cache: 'no-store' });
     const remoto = await res.json();
     if (remoto.error) throw new Error(remoto.error);
-    const antes = JSON.stringify([state.settings, state.produtos, state.registros]);
+    const antes = dadosSync();
     if (remoto.settings && num(remoto.settings.updatedAt) > state.settings.updatedAt) state.settings = normSettings(remoto.settings);
     state.produtos = mergeLista(state.produtos, remoto.produtos, normProduto);
     state.registros = mergeLista(state.registros, remoto.registros, normRegistro);
+    state.vendas = mergeLista(state.vendas, remoto.vendas, normVenda);
+    state.despesas = mergeLista(state.despesas, remoto.despesas, normDespesa);
     save(false);
     const post = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ token, data: paraPlanilha() }) });
@@ -616,9 +895,9 @@ async function sync(manual) {
     if (!ok.ok) throw new Error(ok.error || 'falha ao salvar');
     mostrarSync('ok');
     if (manual) toast('Sincronizado com a planilha');
-    const mudou = antes !== JSON.stringify([state.settings, state.produtos, state.registros]);
+    const mudou = antes !== dadosSync();
     const digitando = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-    if (mudou && (!digitando || manual)) render();
+    if (mudou && !finForm && (!digitando || manual)) render();
   } catch (err) {
     mostrarSync('erro');
     if (manual) toast('Não consegui sincronizar: ' + (err.message === 'chave inválida' ? 'chave inválida' : 'confira o endereço'));
